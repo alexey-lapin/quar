@@ -1,0 +1,28 @@
+{
+  "name": "quar",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@zxing/library": "^0.21.3",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.21"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/qrcode": "^1.5.5",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "vue-tsc": "^3.0.8"
+  }
+}
