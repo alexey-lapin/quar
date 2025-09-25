@@ -13,24 +13,44 @@
       </div>
     </div>
 
-    <div v-if="isScanning" class="scanner-container">
-      <video 
-        ref="videoElement"
-        class="scanner-video"
-        autoplay
-        muted
-        playsinline
-      ></video>
+    <!-- Always show camera area to prevent layout jumps -->
+    <div v-if="isScanning || hasStartedOnce" class="scanner-container">
+      <div class="video-container">
+        <video 
+          ref="videoElement"
+          class="scanner-video"
+          autoplay
+          muted
+          playsinline
+          :style="{ visibility: isScanning ? 'visible' : 'hidden' }"
+        ></video>
+        <div v-if="!isScanning && hasStartedOnce" class="camera-placeholder">
+          <div class="placeholder-content">
+            <p>📷</p>
+            <p class="placeholder-text">{{ statusMessage }}</p>
+          </div>
+        </div>
+      </div>
       
-      <div class="scanner-controls">
+      <div class="camera-info" v-if="currentCameraLabel && isScanning">
+        <p class="current-camera">📷 {{ currentCameraLabel }}</p>
+      </div>
+      
+      <div v-if="isScanning" class="scanner-controls">
         <button @click="stopScanning" class="stop-btn">
           Stop Scanning
         </button>
-        <button @click="toggleCamera" class="camera-btn">
-          Switch Camera
+        <button @click="toggleCamera" class="camera-btn" :disabled="availableDevices.length <= 1">
+          Switch Camera ({{ availableDevices.length }})
         </button>
         <button @click="clearScannedCodes" class="clear-btn">
           Clear Cache
+        </button>
+        <button @click="forceRescan" class="rescan-btn">
+          Force Rescan
+        </button>
+        <button @click="restartScanner" class="restart-btn">
+          Restart Scanner
         </button>
       </div>
     </div>
@@ -49,12 +69,15 @@
       <div v-if="duplicateCount > 0" class="duplicate-info">
         <p>Duplicates ignored: {{ duplicateCount }}</p>
       </div>
+      <div v-if="failedScanCount > 0" class="failed-info">
+        <p>Parse failures: {{ failedScanCount }}</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { BrowserMultiFormatReader } from '@zxing/library'
 import { parseQR } from '../utils/protocol'
 import type { QRProtocol } from '../types'
@@ -65,24 +88,47 @@ const emit = defineEmits<{
 
 const videoElement = ref<HTMLVideoElement>()
 const isScanning = ref(false)
+const hasStartedOnce = ref(false)
 const scanResult = ref<(QRProtocol & { rawData: string }) | null>(null)
 const statusMessage = ref('Ready to scan')
 const duplicateCount = ref(0)
+const failedScanCount = ref(0)
 const scannedCodes = new Map<string, number>() // Store QR data -> timestamp
 
 let codeReader: BrowserMultiFormatReader | null = null
 let currentDeviceId: string | null = null
-let availableDevices: MediaDeviceInfo[] = []
+let preferredDeviceId: string | null = null // Store the user's preferred camera
+const availableDevices = ref<MediaDeviceInfo[]>([])
 
-onMounted(() => {
+const currentCameraLabel = computed(() => {
+  if (!currentDeviceId || availableDevices.value.length === 0) return null
+  const device = availableDevices.value.find(d => d.deviceId === currentDeviceId)
+  return device?.label || 'Unknown Camera'
+})
+
+function initializeScanner() {
   try {
-    codeReader = new BrowserMultiFormatReader()
+    console.log('Initializing QR scanner...')
     
+    // Dispose of old reader if it exists
+    if (codeReader) {
+      console.log('Disposing old reader')
+      codeReader.reset()
+    }
+    
+    codeReader = new BrowserMultiFormatReader()
+    console.log('QR scanner initialized successfully')
     statusMessage.value = 'Ready to scan'
+    return true
   } catch (error) {
     console.error('Failed to initialize scanner:', error)
     statusMessage.value = 'Scanner initialization failed'
+    return false
   }
+}
+
+onMounted(() => {
+  initializeScanner()
 })
 
 onUnmounted(() => {
@@ -97,20 +143,57 @@ async function startScanning() {
 
   try {
     isScanning.value = true
+    hasStartedOnce.value = true
     statusMessage.value = 'Requesting camera access...'
     
     // First, get available devices (this will trigger permission request)
-    availableDevices = await codeReader.listVideoInputDevices()
-    console.log('Available cameras:', availableDevices.length)
+    availableDevices.value = await codeReader.listVideoInputDevices()
+    console.log('Available cameras:', availableDevices.value.length)
     
-    if (availableDevices.length === 0) {
+    if (availableDevices.value.length === 0) {
       statusMessage.value = 'No camera found on this device'
       isScanning.value = false
       return
     }
     
     statusMessage.value = 'Starting camera...'
-    currentDeviceId = availableDevices[0].deviceId
+    
+    // Use preferred device if available, otherwise fall back to the first device
+    let targetDeviceId = availableDevices.value[0].deviceId
+    
+    if (preferredDeviceId) {
+      const preferredDevice = availableDevices.value.find(d => d.deviceId === preferredDeviceId)
+      if (preferredDevice) {
+        targetDeviceId = preferredDeviceId
+        console.log('Using preferred camera:', preferredDevice.label || 'Unknown camera')
+      } else {
+        console.log('Preferred camera not found, using default')
+        // If preferred device is no longer available, try to find the back camera
+        const backCamera = availableDevices.value.find(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('rear') ||
+          d.label.toLowerCase().includes('environment')
+        )
+        if (backCamera) {
+          targetDeviceId = backCamera.deviceId
+          console.log('Using back camera as fallback:', backCamera.label)
+        }
+      }
+    } else {
+      // First time - try to select back camera if available
+      const backCamera = availableDevices.value.find(d => 
+        d.label.toLowerCase().includes('back') || 
+        d.label.toLowerCase().includes('rear') ||
+        d.label.toLowerCase().includes('environment')
+      )
+      if (backCamera) {
+        targetDeviceId = backCamera.deviceId
+        preferredDeviceId = targetDeviceId
+        console.log('Auto-selected back camera:', backCamera.label)
+      }
+    }
+    
+    currentDeviceId = targetDeviceId
     
     await codeReader.decodeFromVideoDevice(
       currentDeviceId,
@@ -151,6 +234,7 @@ function stopScanning() {
   }
   isScanning.value = false
   statusMessage.value = 'Scanning stopped'
+  // Keep hasStartedOnce as true to maintain layout
 }
 
 function clearScannedCodes() {
@@ -159,17 +243,100 @@ function clearScannedCodes() {
   console.log('Cleared scanned codes cache')
 }
 
+function forceRescan() {
+  // Clear the last 3 scanned codes to allow immediate rescanning
+  const entries = Array.from(scannedCodes.entries())
+  const recentEntries = entries
+    .sort(([,a], [,b]) => b - a) // Sort by timestamp, newest first
+    .slice(0, 3) // Take the 3 most recent
+  
+  recentEntries.forEach(([qrData]) => {
+    scannedCodes.delete(qrData)
+    console.log('Removed from cache for rescan:', qrData.slice(0, 20))
+  })
+  
+  console.log('Force rescan: cleared recent scanned codes')
+}
+
+function restartScanner() {
+  console.log('=== RESTARTING SCANNER ===')
+  console.log('Current preferred camera:', preferredDeviceId)
+  
+  // Stop current scanning
+  if (codeReader) {
+    codeReader.reset()
+  }
+  isScanning.value = false
+  
+  // Reset failure count and status
+  failedScanCount.value = 0
+  statusMessage.value = 'Restarting scanner...'
+  
+  // Reinitialize the entire scanner
+  const initialized = initializeScanner()
+  if (!initialized) {
+    console.error('Failed to reinitialize scanner')
+    return
+  }
+  
+  // Wait a moment then restart - startScanning() will use preferredDeviceId
+  setTimeout(async () => {
+    try {
+      await startScanning()
+      console.log('Scanner restarted successfully with preferred camera')
+    } catch (error) {
+      console.error('Failed to restart scanner:', error)
+      statusMessage.value = 'Failed to restart scanner'
+    }
+  }, 500)
+}
+
+// Auto-clear old scanned codes every 30 seconds to prevent getting permanently stuck
+setInterval(() => {
+  const now = Date.now()
+  const oldEntries = []
+  
+  for (const [qrData, timestamp] of scannedCodes.entries()) {
+    if (now - timestamp > 30000) { // 30 seconds
+      oldEntries.push(qrData)
+    }
+  }
+  
+  if (oldEntries.length > 0) {
+    oldEntries.forEach(qrData => scannedCodes.delete(qrData))
+    console.log(`Auto-cleared ${oldEntries.length} old scanned codes`)
+  }
+}, 10000) // Check every 10 seconds
+
 async function toggleCamera() {
-  if (!codeReader || availableDevices.length <= 1) return
+  if (!codeReader || availableDevices.value.length <= 1) {
+    console.log('Cannot toggle camera - only one device available')
+    return
+  }
   
-  const currentIndex = availableDevices.findIndex(d => d.deviceId === currentDeviceId)
-  const nextIndex = (currentIndex + 1) % availableDevices.length
+  console.log('Toggling camera...')
+  const currentIndex = availableDevices.value.findIndex(d => d.deviceId === currentDeviceId)
+  const nextIndex = (currentIndex + 1) % availableDevices.value.length
+  const nextDevice = availableDevices.value[nextIndex]
   
+  console.log(`Switching from camera ${currentIndex} to camera ${nextIndex}`)
+  console.log(`Next camera: ${nextDevice.label || 'Unknown'}`)
+  
+  // Save the new preferred device BEFORE stopping
+  preferredDeviceId = nextDevice.deviceId
+  currentDeviceId = nextDevice.deviceId
+  
+  // Stop and restart with the new preferred camera
   stopScanning()
-  currentDeviceId = availableDevices[nextIndex].deviceId
   
-  setTimeout(() => {
-    startScanning()
+  setTimeout(async () => {
+    try {
+      await startScanning()
+      console.log('Camera toggle completed successfully')
+    } catch (error) {
+      console.error('Failed to restart with new camera:', error)
+      statusMessage.value = 'Failed to switch camera'
+    }
   }, 100)
 }
 
@@ -177,9 +344,23 @@ function handleScanResult(rawData: string) {
   const now = Date.now()
   console.log('=== QR SCAN DEBUG ===')
   console.log('Timestamp:', now)
+  console.log('Raw scanned data type:', typeof rawData)
   console.log('Raw scanned data:', rawData)
-  console.log('Length:', rawData.length)
-  console.log('First 50 chars:', rawData.slice(0, 50))
+  console.log('Length:', rawData?.length || 'undefined')
+  console.log('First 50 chars:', rawData?.slice(0, 50) || 'N/A')
+  
+  // Validate basic data integrity
+  if (typeof rawData !== 'string') {
+    console.log('ERROR: rawData is not a string!')
+    statusMessage.value = 'Invalid scan result (not string)'
+    return
+  }
+  
+  if (rawData.length === 0) {
+    console.log('ERROR: rawData is empty string!')
+    statusMessage.value = 'Invalid scan result (empty)'
+    return
+  }
   
   // Check if we've seen this exact raw data before
   const lastScanTime = scannedCodes.get(rawData)
@@ -187,25 +368,65 @@ function handleScanResult(rawData: string) {
     const timeSinceLastScan = now - lastScanTime
     console.log(`DUPLICATE: Already scanned ${timeSinceLastScan}ms ago`)
     
-    // Allow re-scanning after 5 seconds (for debugging purposes)
-    if (timeSinceLastScan < 5000) {
+    // For data QRs, allow re-scanning after 3 seconds (shorter timeout)
+    // For other QRs, use 5 seconds
+    const timeoutMs = rawData.startsWith('D') ? 3000 : 5000
+    
+    if (timeSinceLastScan < timeoutMs) {
       duplicateCount.value++
       return
     } else {
-      console.log('RESCAN: Allowing rescan after timeout')
+      console.log(`RESCAN: Allowing rescan after ${timeoutMs}ms timeout`)
     }
   }
   
-  scannedCodes.set(rawData, now)
-  
-  const parsed = parseQR(rawData)
+  let parsed = parseQR(rawData)
   console.log('Parsed result:', JSON.stringify(parsed, null, 2))
   
+  // If parsing failed, try some basic cleanup
+  if (!parsed && rawData.length > 0) {
+    console.log('RETRY: Attempting to clean and re-parse QR data')
+    
+    // Try trimming whitespace
+    const trimmed = rawData.trim()
+    if (trimmed !== rawData) {
+      console.log('Trying trimmed version:', trimmed.slice(0, 50))
+      parsed = parseQR(trimmed)
+    }
+    
+    // Try removing null bytes or other control characters
+    if (!parsed) {
+      const cleaned = rawData.replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+      if (cleaned !== rawData && cleaned.length > 0) {
+        console.log('Trying cleaned version:', cleaned.slice(0, 50))
+        parsed = parseQR(cleaned)
+      }
+    }
+  }
+  
   if (!parsed) {
-    console.log('INVALID: Failed to parse QR code')
+    console.log('INVALID: Failed to parse QR code after cleanup attempts')
     statusMessage.value = `Invalid QR code format: ${rawData.slice(0, 20)}...`
+    
+    // Add a recovery mechanism - restart scanner after a few failed attempts
+    failedScanCount.value++
+    console.log(`Failed scan count: ${failedScanCount.value}`)
+    
+    if (failedScanCount.value >= 3) {
+      console.log('Too many failed scans, restarting scanner...')
+      setTimeout(() => {
+        restartScanner()
+      }, 1000)
+    }
+    
     return
   }
+  
+  // Reset failed count on successful scan
+  failedScanCount.value = 0
+  
+  // Only add successfully parsed QR codes to prevent getting stuck on invalid ones
+  scannedCodes.set(rawData, now)
   
   console.log('SUCCESS: Valid QR code parsed, type:', parsed.type)
   const result = { ...parsed, rawData }
@@ -296,13 +517,64 @@ function truncateData(data: string, maxLength = 50): string {
   margin-bottom: 24px;
 }
 
-.scanner-video {
+.video-container {
+  position: relative;
   width: 100%;
   max-width: 500px;
-  height: auto;
+  aspect-ratio: 4/3; /* Reserve consistent space */
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   background: #000;
+  overflow: hidden;
+}
+
+.scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  color: #ccc;
+}
+
+.placeholder-content {
+  text-align: center;
+}
+
+.camera-placeholder p {
+  margin: 0;
+}
+
+.camera-placeholder p:first-child {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.placeholder-text {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.camera-info {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.current-camera {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
 }
 
 .scanner-controls {
@@ -313,7 +585,10 @@ function truncateData(data: string, maxLength = 50): string {
 }
 
 .stop-btn,
-.camera-btn {
+.camera-btn,
+.clear-btn,
+.rescan-btn,
+.restart-btn {
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
@@ -336,8 +611,41 @@ function truncateData(data: string, maxLength = 50): string {
   color: white;
 }
 
-.camera-btn:hover {
+.camera-btn:hover:not(:disabled) {
   background: #0056b3;
+}
+
+.camera-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.clear-btn {
+  background: #ffc107;
+  color: #212529;
+}
+
+.clear-btn:hover {
+  background: #e0a800;
+}
+
+.rescan-btn {
+  background: #17a2b8;
+  color: white;
+}
+
+.rescan-btn:hover {
+  background: #138496;
+}
+
+.restart-btn {
+  background: #fd7e14;
+  color: white;
+}
+
+.restart-btn:hover {
+  background: #e8680b;
 }
 
 .scan-result {
@@ -397,13 +705,20 @@ function truncateData(data: string, maxLength = 50): string {
 }
 
 @media (max-width: 600px) {
+  .video-container {
+    aspect-ratio: 3/4; /* Better mobile aspect ratio */
+  }
+  
   .scanner-controls {
     flex-direction: column;
     align-items: center;
   }
   
   .stop-btn,
-  .camera-btn {
+  .camera-btn,
+  .clear-btn,
+  .rescan-btn,
+  .restart-btn {
     width: 200px;
   }
 }

@@ -76,8 +76,17 @@ export function createBatchQR(batch: BatchInfo): string {
 
 export function parseQR(qrData: string): QRProtocol | null {
   console.log('=== parseQR DEBUG ===')
+  console.log('Input data type:', typeof qrData)
   console.log('Input data:', qrData)
   console.log('Input length:', qrData?.length)
+  
+  // Log the first few characters in detail
+  if (qrData && qrData.length > 0) {
+    console.log('First 10 characters:')
+    for (let i = 0; i < Math.min(10, qrData.length); i++) {
+      console.log(`  [${i}]: '${qrData[i]}' (code: ${qrData.charCodeAt(i)})`)
+    }
+  }
   
   if (!qrData || qrData.length === 0) {
     console.log('ERROR: empty or null data')
@@ -86,19 +95,22 @@ export function parseQR(qrData: string): QRProtocol | null {
   
   const type = qrData[0] as 'T' | 'D' | 'B'
   console.log('Detected type:', type)
-  console.log('Valid types:', ['T', 'D', 'B'].includes(type))
+  console.log('Valid types check:', ['T', 'D', 'B'].includes(type))
   
   if (!['T', 'D', 'B'].includes(type)) {
-    console.log('ERROR: invalid type, first char is:', qrData.charCodeAt(0))
+    console.log('ERROR: invalid type')
+    console.log('First char code:', qrData.charCodeAt(0))
+    console.log('Expected codes: T=84, D=68, B=66')
+    console.log('Full data (first 100 chars):', qrData.slice(0, 100))
     return null
   }
   
   const data = qrData.slice(1)
-  console.log('Extracted data:', data)
-  console.log('Data length:', data.length)
+  console.log('Extracted data length:', data.length)
+  console.log('Extracted data (first 50 chars):', data.slice(0, 50))
   
   const result = { type, data }
-  console.log('Final result:', JSON.stringify(result, null, 2))
+  console.log('SUCCESS: parseQR returning valid result')
   console.log('=== END parseQR DEBUG ===')
   return result
 }
