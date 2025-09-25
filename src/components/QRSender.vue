@@ -421,15 +421,15 @@ async function restartFromBeginning() {
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 20px;
+  padding: 5px;
   background: #f5f5f5;
 }
 
 .qr-container {
   width: 100%;
   height: 100%;
-  max-width: calc(100vh - 40px);
-  max-height: calc(100vh - 40px);
+  max-width: calc(100vh - 10px);
+  max-height: calc(100vh - 10px);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -618,12 +618,12 @@ async function restartFromBeginning() {
   .qr-display {
     order: 1;
     flex: 1;
-    padding: 20px;
+    padding: 5px;
   }
   
   .qr-container {
-    max-width: calc(60vh - 40px);
-    max-height: calc(60vh - 40px);
+    max-width: calc(60vh - 10px);
+    max-height: calc(60vh - 10px);
   }
   
   .rotation-controls,
@@ -644,12 +644,12 @@ async function restartFromBeginning() {
 
 @media (max-width: 600px) {
   .qr-display {
-    padding: 10px;
+    padding: 3px;
   }
   
   .qr-container {
-    max-width: calc(50vh - 20px);
-    max-height: calc(50vh - 20px);
+    max-width: calc(50vh - 6px);
+    max-height: calc(50vh - 6px);
   }
   
   .controls-panel {

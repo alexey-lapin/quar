@@ -459,9 +459,12 @@ function truncateData(data: string, maxLength = 50): string {
 
 <style scoped>
 .qr-scanner {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
 }
 
 .scanner-header {
@@ -513,19 +516,23 @@ function truncateData(data: string, maxLength = 50): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex: 1;
 }
 
 .video-container {
   position: relative;
   width: 100%;
-  max-width: 500px;
-  aspect-ratio: 4/3; /* Reserve consistent space */
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  height: 100%;
+  max-width: calc(100vh - 10px);
+  max-height: calc(100vh - 150px);
+  aspect-ratio: 4/3;
+  border: none;
+  border-radius: 0;
   background: #000;
   overflow: hidden;
+  flex: 1;
 }
 
 .scanner-video {

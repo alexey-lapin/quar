@@ -306,7 +306,7 @@ function formatFileSize(bytes: number): string {
 .receiver-header {
   text-align: center;
   margin: 0;
-  padding: 20px;
+  padding: 12px 20px;
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid #e0e0e0;
   flex-shrink: 0;
@@ -348,10 +348,10 @@ function formatFileSize(bytes: number): string {
 
 .info-overlay {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   width: 280px;
-  max-height: calc(100% - 40px);
+  max-height: calc(100% - 20px);
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   padding: 16px;
@@ -511,9 +511,9 @@ function formatFileSize(bytes: number): string {
 @media (max-width: 768px) {
   .info-overlay {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
     top: auto;
     width: auto;
     max-height: 50vh;
@@ -534,9 +534,9 @@ function formatFileSize(bytes: number): string {
 
 @media (max-width: 480px) {
   .info-overlay {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
     padding: 12px;
   }
   
