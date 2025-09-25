@@ -30,11 +30,11 @@
           {{ isRotating ? '⏸️ Pause Cycle' : '▶️ Start Cycle' }}
         </button>
         
-        <button @click="previousQR" :disabled="currentQRIndex === 0" class="nav-btn">
+        <button @click="previousQR" class="nav-btn">
           ← Previous
         </button>
         
-        <button @click="nextQR" :disabled="currentQRIndex === currentBatchQRs.length - 1" class="nav-btn">
+        <button @click="nextQR" class="nav-btn">
           Next →
         </button>
         
@@ -304,12 +304,18 @@ function updateRotationSpeed() {
 function previousQR() {
   if (currentQRIndex.value > 0) {
     currentQRIndex.value--
+  } else {
+    // Wrap around to the last QR
+    currentQRIndex.value = currentBatchQRs.value.length - 1
   }
 }
 
 function nextQR() {
   if (currentQRIndex.value < currentBatchQRs.value.length - 1) {
     currentQRIndex.value++
+  } else {
+    // Wrap around to the first QR
+    currentQRIndex.value = 0
   }
 }
 
