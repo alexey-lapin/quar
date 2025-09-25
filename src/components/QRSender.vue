@@ -29,6 +29,7 @@
       <div class="qr-info">
         <p>QR {{ currentQRIndex + 1 }} of {{ currentBatchQRs.length }}</p>
         <p class="qr-type">{{ getQRTypeDescription() }}</p>
+        <p v-if="isRotating" class="cycle-status">🔄 Cycling {{ getCycleStatus() }}</p>
       </div>
       
       <div class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 12px; word-break: break-all;">
@@ -44,7 +45,7 @@
           :class="{ active: isRotating }"
           class="rotation-btn"
         >
-          {{ isRotating ? 'Pause' : 'Play' }}
+          {{ isRotating ? '⏸️ Pause Cycle' : '▶️ Start Cycle' }}
         </button>
         
         <button @click="previousQR" :disabled="currentQRIndex === 0" class="nav-btn">
@@ -53,6 +54,10 @@
         
         <button @click="nextQR" :disabled="currentQRIndex === currentBatchQRs.length - 1" class="nav-btn">
           Next →
+        </button>
+        
+        <button @click="restartFromBeginning" class="restart-btn">
+          🔄 Restart from Beginning
         </button>
       </div>
 
@@ -106,6 +111,8 @@ const currentBatchQRs = ref<string[]>([])
 const isRotating = ref(false)
 const rotationSpeed = ref(props.config.rotationSpeed)
 const rotationInterval = ref<NodeJS.Timeout | null>(null)
+const hasShownTransmissionInfo = ref(false)
+const hasShownCurrentBatchInfo = ref(false)
 
 const currentBatch = computed(() => props.batches[currentBatchIndex.value])
 const currentQR = computed(() => {
@@ -153,6 +160,14 @@ function getQRTypeDescription(): string {
   return 'Data Chunk'
 }
 
+function getCycleStatus(): string {
+  const type = getQRTypeDescription()
+  if (type === 'Data Chunk') {
+    return 'data chunks'
+  }
+  return type.toLowerCase()
+}
+
 function getCurrentQRData(): string {
   const qrUrl = currentQR.value
   if (!qrUrl) return 'No QR data'
@@ -197,14 +212,57 @@ function toggleRotation() {
 
 function startRotation() {
   isRotating.value = true
-  console.log('Starting QR rotation, speed:', rotationSpeed.value)
+  console.log('Starting QR cycling, speed:', rotationSpeed.value)
+  
   rotationInterval.value = setInterval(() => {
-    console.log(`Rotating QR: ${currentQRIndex.value} -> ${currentQRIndex.value + 1}`)
-    if (currentQRIndex.value < currentBatchQRs.value.length - 1) {
-      currentQRIndex.value++
+    console.log(`Current QR: ${currentQRIndex.value} (batch ${currentBatchIndex.value})`)
+    
+    // Handle first batch - show transmission info once, then cycle data
+    if (currentBatchIndex.value === 0) {
+      if (!hasShownTransmissionInfo.value) {
+        // Show transmission info (index 0)
+        hasShownTransmissionInfo.value = true
+        currentQRIndex.value = 0
+        console.log('Showing transmission info')
+        return
+      }
+      
+      if (!hasShownCurrentBatchInfo.value) {
+        // Show batch info (index 1)
+        hasShownCurrentBatchInfo.value = true
+        currentQRIndex.value = 1
+        console.log('Showing batch info')
+        return
+      }
+      
+      // Cycle through data chunks (index 2+)
+      if (currentQRIndex.value < 2) {
+        currentQRIndex.value = 2 // Start with first data chunk
+      } else if (currentQRIndex.value < currentBatchQRs.value.length - 1) {
+        currentQRIndex.value++
+      } else {
+        currentQRIndex.value = 2 // Loop back to first data chunk
+      }
+      console.log(`Cycling data chunk: ${currentQRIndex.value}`)
     } else {
-      console.log('Rotation complete, stopping')
-      stopRotation()
+      // Handle subsequent batches - show batch info once, then cycle data
+      if (!hasShownCurrentBatchInfo.value) {
+        // Show batch info (index 0)
+        hasShownCurrentBatchInfo.value = true
+        currentQRIndex.value = 0
+        console.log('Showing batch info for batch', currentBatchIndex.value)
+        return
+      }
+      
+      // Cycle through data chunks (index 1+)
+      if (currentQRIndex.value < 1) {
+        currentQRIndex.value = 1 // Start with first data chunk
+      } else if (currentQRIndex.value < currentBatchQRs.value.length - 1) {
+        currentQRIndex.value++
+      } else {
+        currentQRIndex.value = 1 // Loop back to first data chunk
+      }
+      console.log(`Cycling data chunk: ${currentQRIndex.value}`)
     }
   }, rotationSpeed.value)
 }
@@ -240,6 +298,7 @@ async function previousBatch() {
   if (currentBatchIndex.value > 0) {
     stopRotation()
     currentBatchIndex.value--
+    hasShownCurrentBatchInfo.value = false
     await loadCurrentBatch()
   }
 }
@@ -248,8 +307,19 @@ async function nextBatch() {
   if (currentBatchIndex.value < props.batches.length - 1) {
     stopRotation()
     currentBatchIndex.value++
+    hasShownCurrentBatchInfo.value = false
     await loadCurrentBatch()
   }
+}
+
+async function restartFromBeginning() {
+  stopRotation()
+  hasShownTransmissionInfo.value = false
+  hasShownCurrentBatchInfo.value = false
+  currentBatchIndex.value = 0
+  currentQRIndex.value = 0
+  await loadCurrentBatch()
+  console.log('Restarted transmission from beginning')
 }
 </script>
 
@@ -334,6 +404,12 @@ async function nextBatch() {
   color: #007bff !important;
 }
 
+.cycle-status {
+  font-size: 12px !important;
+  color: #28a745 !important;
+  font-style: italic;
+}
+
 .controls {
   display: flex;
   flex-direction: column;
@@ -358,7 +434,8 @@ async function nextBatch() {
 
 .nav-btn,
 .batch-btn,
-.rotation-btn {
+.rotation-btn,
+.restart-btn {
   padding: 8px 16px;
   background: #007bff;
   color: white;
@@ -367,6 +444,15 @@ async function nextBatch() {
   cursor: pointer;
   font-size: 14px;
   transition: background 0.2s;
+}
+
+.restart-btn {
+  background: #ffc107;
+  color: #212529;
+}
+
+.restart-btn:hover {
+  background: #e0a800;
 }
 
 .nav-btn:hover:not(:disabled),
