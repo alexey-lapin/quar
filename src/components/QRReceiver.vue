@@ -10,74 +10,62 @@
     </div>
 
     <div v-if="isReceiving" class="receiver-content">
-      <QRScanner @qr-scanned="handleQRScanned" />
+      <div class="camera-section">
+        <QRScanner @qr-scanned="handleQRScanned" />
+      </div>
       
-      <div v-if="fileState.transmissionInfo" class="transmission-info">
-        <h3>Receiving: {{ fileState.transmissionInfo.filename }}</h3>
-        <div class="file-stats">
-          <p>Size: {{ formatFileSize(fileState.transmissionInfo.fileSize) }}</p>
-          <p>Total Chunks: {{ fileState.transmissionInfo.totalChunks }}</p>
+      <div class="info-overlay">
+        <div v-if="fileState.transmissionInfo" class="transmission-info">
+          <h3>{{ fileState.transmissionInfo.filename }}</h3>
+          <p>{{ formatFileSize(fileState.transmissionInfo.fileSize) }} | {{ fileState.transmissionInfo.totalChunks }} chunks</p>
         </div>
-      </div>
 
-      <div v-if="fileState.currentBatch" class="batch-info">
-        <h4>Current Batch</h4>
-        <p>Batch {{ fileState.currentBatch.batchNumber + 1 }} of {{ fileState.currentBatch.totalBatches }}</p>
-        <p>Chunks {{ fileState.currentBatch.startChunk }} - {{ fileState.currentBatch.endChunk }}</p>
-        
-        <div class="batch-progress">
-          <div class="batch-progress-bar">
-            <div 
-              class="batch-progress-fill" 
-              :style="{ width: batchProgressPercent + '%' }"
-            ></div>
+        <div v-if="fileState.currentBatch" class="batch-info">
+          <p>Batch {{ fileState.currentBatch.batchNumber + 1 }}/{{ fileState.currentBatch.totalBatches }}</p>
+          <div class="batch-progress">
+            <div class="batch-progress-bar">
+              <div 
+                class="batch-progress-fill" 
+                :style="{ width: batchProgressPercent + '%' }"
+              ></div>
+            </div>
+            <span>{{ receivedInCurrentBatch }}/{{ currentBatchSize }}</span>
           </div>
-          <span>{{ receivedInCurrentBatch }} / {{ currentBatchSize }} received</span>
         </div>
-      </div>
 
-      <div class="overall-progress">
-        <h4>Overall Progress</h4>
-        <div class="progress-stats">
-          <p>Received: {{ fileState.receivedChunks.size }} / {{ fileState.transmissionInfo?.totalChunks || 0 }}</p>
+        <div class="overall-progress">
+          <p>Progress: {{ fileState.receivedChunks.size }}/{{ fileState.transmissionInfo?.totalChunks || 0 }} ({{ Math.round(overallProgressPercent) }}%)</p>
           <div class="progress-bar">
             <div 
               class="progress-fill" 
               :style="{ width: overallProgressPercent + '%' }"
             ></div>
           </div>
-          <span>{{ Math.round(overallProgressPercent) }}%</span>
         </div>
-      </div>
 
-      <div v-if="fileState.missingChunks.size > 0" class="missing-chunks">
-        <h4>Missing Chunks</h4>
-        <div class="missing-list">
-          {{ Array.from(fileState.missingChunks).slice(0, 10).join(', ') }}
-          <span v-if="fileState.missingChunks.size > 10">
-            ... and {{ fileState.missingChunks.size - 10 }} more
-          </span>
+        <div v-if="fileState.missingChunks.size > 0" class="missing-chunks">
+          <p>Missing: {{ fileState.missingChunks.size }} chunks</p>
         </div>
-      </div>
 
-      <div class="receiver-controls">
-        <button @click="nextBatch" :disabled="!canNextBatch" class="batch-btn">
-          Next Batch
-        </button>
-        <button @click="resetReceiver" class="reset-btn">
-          Reset
-        </button>
-        <button 
-          @click="downloadFile" 
-          :disabled="!fileState.isComplete"
-          class="download-btn"
-        >
-          Download File
-        </button>
-      </div>
+        <div class="receiver-controls">
+          <button @click="nextBatch" :disabled="!canNextBatch" class="batch-btn">
+            Next Batch
+          </button>
+          <button @click="resetReceiver" class="reset-btn">
+            Reset
+          </button>
+          <button 
+            @click="downloadFile" 
+            :disabled="!fileState.isComplete"
+            class="download-btn"
+          >
+            Download
+          </button>
+        </div>
 
-      <div v-if="verificationStatus" class="verification-status" :class="verificationStatus.type">
-        <p>{{ verificationStatus.message }}</p>
+        <div v-if="verificationStatus" class="verification-status" :class="verificationStatus.type">
+          <p>{{ verificationStatus.message }}</p>
+        </div>
       </div>
     </div>
   </div>
@@ -307,14 +295,21 @@ function formatFileSize(bytes: number): string {
 
 <style scoped>
 .qr-receiver {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .receiver-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin: 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 .receiver-header h2 {
@@ -341,48 +336,71 @@ function formatFileSize(bytes: number): string {
 .receiver-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.camera-section {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.info-overlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 280px;
+  max-height: calc(100% - 40px);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  backdrop-filter: blur(10px);
+  overflow-y: auto;
+  z-index: 10;
 }
 
 .transmission-info,
 .batch-info,
 .overall-progress,
 .missing-chunks {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 16px;
 }
 
-.transmission-info h3,
-.batch-info h4,
-.overall-progress h4,
-.missing-chunks h4 {
-  margin: 0 0 12px 0;
+.transmission-info h3 {
+  margin: 0 0 8px 0;
   color: #333;
+  font-size: 16px;
+  font-weight: 600;
 }
 
-.file-stats p,
+.transmission-info p,
 .batch-info p,
-.progress-stats p {
+.overall-progress p,
+.missing-chunks p {
   margin: 4px 0;
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .batch-progress,
 .progress-stats {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .batch-progress-bar,
 .progress-bar {
   width: 100%;
-  height: 8px;
+  height: 6px;
   background: #e0e0e0;
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin: 4px 0;
 }
 
 .batch-progress-fill,
@@ -392,17 +410,9 @@ function formatFileSize(bytes: number): string {
   transition: width 0.3s ease;
 }
 
-.progress-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.progress-stats span {
-  align-self: flex-end;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+.batch-progress span {
+  font-size: 12px;
+  color: #666;
 }
 
 .missing-list {
@@ -417,20 +427,24 @@ function formatFileSize(bytes: number): string {
 
 .receiver-controls {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
+  margin-top: 12px;
 }
 
 .batch-btn,
 .reset-btn,
 .download-btn {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
+  flex: 1;
+  min-width: 0;
 }
 
 .batch-btn {
@@ -471,9 +485,10 @@ function formatFileSize(bytes: number): string {
 }
 
 .verification-status {
-  padding: 12px;
+  padding: 10px;
   border-radius: 6px;
   text-align: center;
+  margin-top: 12px;
 }
 
 .verification-status.success {
@@ -493,21 +508,47 @@ function formatFileSize(bytes: number): string {
   font-weight: 500;
 }
 
-@media (max-width: 600px) {
-  .file-stats,
-  .progress-stats {
-    text-align: center;
+@media (max-width: 768px) {
+  .info-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    top: auto;
+    width: auto;
+    max-height: 50vh;
   }
   
   .receiver-controls {
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    gap: 6px;
   }
   
   .batch-btn,
   .reset-btn,
   .download-btn {
-    width: 200px;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .info-overlay {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 12px;
+  }
+  
+  .transmission-info h3 {
+    font-size: 14px;
+  }
+  
+  .transmission-info p,
+  .batch-info p,
+  .overall-progress p,
+  .missing-chunks p {
+    font-size: 12px;
   }
 }
 </style>

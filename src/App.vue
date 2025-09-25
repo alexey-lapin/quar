@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ fullscreen: isFullscreen }">
     <header class="app-header">
       <h1>QUAR - QR Code File Transfer</h1>
       <nav class="app-nav">
@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import FileUploader from './components/FileUploader.vue'
 import QRSender from './components/QRSender.vue'
 import QRReceiver from './components/QRReceiver.vue'
@@ -69,6 +69,10 @@ type ViewType = 'sender' | 'receiver'
 
 const currentView = ref<ViewType>('sender')
 const senderData = ref<any>(null)
+
+const isFullscreen = computed(() => {
+  return (currentView.value === 'sender' && senderData.value) || currentView.value === 'receiver'
+})
 
 function handleFileProcessed(data: any) {
   senderData.value = data
@@ -97,6 +101,22 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Full viewport mode for QR sender/receiver */
+#app.fullscreen {
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app.fullscreen .app-header,
+#app.fullscreen .app-footer {
+  display: none;
+}
+
+#app.fullscreen .app-main {
+  padding: 0;
+  height: 100vh;
 }
 
 .app-header {

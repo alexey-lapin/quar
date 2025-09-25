@@ -1,45 +1,27 @@
 <template>
   <div class="qr-sender">
-    <div class="sender-header">
-      <h2>Sending: {{ transmissionInfo.filename }}</h2>
-      <div class="progress-info">
-        <p>Batch {{ currentBatchIndex + 1 }} of {{ batches.length }}</p>
-        <div class="progress-bar">
-          <div 
-            class="progress-fill" 
-            :style="{ width: progressPercent + '%' }"
-          ></div>
+    <div class="main-content">
+      <!-- Controls on the left -->
+      <div class="controls-panel">
+        <!-- File info at the top of controls -->
+        <div class="file-info-section">
+          <h2 class="file-name">{{ transmissionInfo.filename }}</h2>
+          <div class="batch-progress-info">
+            <p>Batch {{ currentBatchIndex + 1 }} of {{ batches.length }}</p>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ width: progressPercent + '%' }"
+              ></div>
+            </div>
+            <span class="progress-text">{{ Math.round(progressPercent) }}% complete</span>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <div class="qr-display">
-      <div class="qr-container">
-        <img 
-          v-if="currentQR" 
-          :src="currentQR" 
-          alt="QR Code"
-          class="qr-image"
-        />
-        <div v-else class="qr-placeholder">
-          Generating QR codes...
-        </div>
-      </div>
-      
-      <div class="qr-info">
-        <p>QR {{ currentQRIndex + 1 }} of {{ currentBatchQRs.length }}</p>
-        <p class="qr-type">{{ getQRTypeDescription() }}</p>
-        <p v-if="isRotating" class="cycle-status">🔄 Cycling {{ getCycleStatus() }}</p>
-      </div>
-      
-      <div class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 12px; word-break: break-all;">
-        <strong>Debug - Raw QR Data:</strong><br>
-        {{ getCurrentQRData() }}
-      </div>
-    </div>
-
-    <div class="controls">
-      <div class="rotation-controls">
+        <div class="controls">
+          <div class="control-section">
+            <h3 class="control-title">Playback Controls</h3>
+            <div class="rotation-controls">
         <button 
           @click="toggleRotation"
           :class="{ active: isRotating }"
@@ -59,37 +41,74 @@
         <button @click="restartFromBeginning" class="restart-btn">
           🔄 Restart from Beginning
         </button>
-      </div>
+            </div>
+          </div>
 
-      <div class="batch-controls">
-        <button 
-          @click="previousBatch" 
-          :disabled="currentBatchIndex === 0"
-          class="batch-btn"
-        >
-          ← Previous Batch
-        </button>
+          <div class="control-section">
+            <h3 class="control-title">Batch Navigation</h3>
+            <div class="batch-controls">
+              <button 
+                @click="previousBatch" 
+                :disabled="currentBatchIndex === 0"
+                class="batch-btn"
+              >
+                ← Previous Batch
+              </button>
+              
+              <button 
+                @click="nextBatch" 
+                :disabled="currentBatchIndex === batches.length - 1"
+                class="batch-btn"
+              >
+                Next Batch →
+              </button>
+            </div>
+          </div>
+
+        <div class="control-section">
+          <h3 class="control-title">Speed Control</h3>
+          <div class="speed-control">
+            <label>Speed (ms): </label>
+            <input 
+              type="range" 
+              v-model.number="rotationSpeed"
+              min="1000" 
+              max="5000" 
+              step="500"
+              @input="updateRotationSpeed"
+            />
+            <span>{{ rotationSpeed }}</span>
+          </div>
+        </div>
+        </div>
         
-        <button 
-          @click="nextBatch" 
-          :disabled="currentBatchIndex === batches.length - 1"
-          class="batch-btn"
-        >
-          Next Batch →
-        </button>
+        <div class="qr-info-panel">
+          <div class="qr-info">
+            <p>QR {{ currentQRIndex + 1 }} of {{ currentBatchQRs.length }}</p>
+            <p class="qr-type">{{ getQRTypeDescription() }}</p>
+            <p v-if="isRotating" class="cycle-status">🔄 Cycling {{ getCycleStatus() }}</p>
+          </div>
+          
+          <div class="debug-info">
+            <strong>Debug - Raw QR Data:</strong><br>
+            {{ getCurrentQRData() }}
+          </div>
+        </div>
       </div>
 
-      <div class="speed-control">
-        <label>Speed (ms): </label>
-        <input 
-          type="range" 
-          v-model.number="rotationSpeed"
-          min="1000" 
-          max="5000" 
-          step="500"
-          @input="updateRotationSpeed"
-        />
-        <span>{{ rotationSpeed }}</span>
+      <!-- QR display on the right -->
+      <div class="qr-display">
+        <div class="qr-container">
+          <img 
+            v-if="currentQR" 
+            :src="currentQR" 
+            alt="QR Code"
+            class="qr-image"
+          />
+          <div v-else class="qr-placeholder">
+            Generating QR codes...
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -325,25 +344,34 @@ async function restartFromBeginning() {
 
 <style scoped>
 .qr-sender {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.sender-header {
-  text-align: center;
-  margin-bottom: 24px;
+.file-info-section {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
 }
 
-.sender-header h2 {
-  margin: 0 0 16px 0;
+.file-name {
+  margin: 0 0 12px 0;
   color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  word-break: break-word;
 }
 
-.progress-info p {
+.batch-progress-info p {
   margin: 0 0 8px 0;
   color: #666;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .progress-bar {
@@ -352,6 +380,7 @@ async function restartFromBeginning() {
   background: #e0e0e0;
   border-radius: 4px;
   overflow: hidden;
+  margin-bottom: 6px;
 }
 
 .progress-fill {
@@ -360,28 +389,61 @@ async function restartFromBeginning() {
   transition: width 0.3s ease;
 }
 
-.qr-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 32px;
+.progress-text {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
 }
 
-.qr-container {
-  width: 512px;
-  height: 512px;
+.main-content {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  min-height: 0;
+  height: 100vh;
+}
+
+.controls-panel {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(248, 249, 250, 0.98);
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+}
+
+.qr-display {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  min-height: 0;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+.qr-container {
+  width: 100%;
+  height: 100%;
+  max-width: calc(100vh - 40px);
+  max-height: calc(100vh - 40px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
   background: white;
-  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .qr-image {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .qr-placeholder {
@@ -389,14 +451,36 @@ async function restartFromBeginning() {
   font-style: italic;
 }
 
+.qr-info-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .qr-info {
-  text-align: center;
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
 }
 
 .qr-info p {
   margin: 4px 0;
   color: #666;
   font-size: 14px;
+}
+
+.debug-info {
+  background: #f0f0f0;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+  border: 1px solid #ddd;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .qr-type {
@@ -413,15 +497,30 @@ async function restartFromBeginning() {
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+}
+
+.control-section {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.control-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
 }
 
 .rotation-controls,
 .batch-controls {
   display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .rotation-btn.active {
@@ -436,14 +535,16 @@ async function restartFromBeginning() {
 .batch-btn,
 .rotation-btn,
 .restart-btn {
-  padding: 8px 16px;
+  padding: 12px 16px;
   background: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
   transition: background 0.2s;
+  width: 100%;
 }
 
 .restart-btn {
@@ -468,40 +569,118 @@ async function restartFromBeginning() {
 }
 
 .speed-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  /* Styling now handled by .control-section */
+}
+
+.speed-control label {
+  display: block;
+  margin-bottom: 8px;
   font-size: 14px;
   color: #666;
+  font-weight: 500;
 }
 
 .speed-control input[type="range"] {
-  width: 200px;
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .speed-control span {
-  min-width: 50px;
+  display: block;
   text-align: center;
   font-weight: 500;
   color: #333;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .controls-panel {
+    width: 100%;
+    order: 2;
+    padding: 16px;
+    background: rgba(248, 249, 250, 0.98);
+    border-right: none;
+    border-top: 1px solid #e0e0e0;
+    max-height: 40vh;
+  }
+  
+  .file-info-section {
+    margin-bottom: 16px;
+  }
+  
+  .file-name {
+    font-size: 16px;
+  }
+  
+  .qr-display {
+    order: 1;
+    flex: 1;
+    padding: 20px;
+  }
+  
   .qr-container {
-    width: 300px;
-    height: 300px;
+    max-width: calc(60vh - 40px);
+    max-height: calc(60vh - 40px);
+  }
+  
+  .rotation-controls,
+  .batch-controls {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .nav-btn,
+  .batch-btn,
+  .rotation-btn,
+  .restart-btn {
+    width: auto;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 600px) {
+  .qr-display {
+    padding: 10px;
+  }
+  
+  .qr-container {
+    max-width: calc(50vh - 20px);
+    max-height: calc(50vh - 20px);
+  }
+  
+  .controls-panel {
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .file-info-section {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .file-name {
+    font-size: 14px;
+    margin-bottom: 8px;
   }
   
   .rotation-controls,
   .batch-controls {
     flex-direction: column;
     align-items: center;
+    gap: 6px;
   }
   
-  .speed-control {
-    flex-direction: column;
-    gap: 4px;
+  .nav-btn,
+  .batch-btn,
+  .rotation-btn,
+  .restart-btn {
+    width: 180px;
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }
 </style>
