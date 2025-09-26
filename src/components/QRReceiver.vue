@@ -11,10 +11,17 @@
 
     <div v-if="isReceiving" class="receiver-content">
       <div class="camera-section">
-        <QRScanner @qr-scanned="handleQRScanned" />
-        
-        <!-- Transparent scan info overlay over camera -->
-        <div class="scan-info-overlay">
+        <div class="camera-wrapper">
+          <QRScanner @qr-scanned="handleQRScanned" ref="qrScanner" :embedded="true" />
+          
+          <!-- Transparent scan info overlay over camera -->
+          <div class="scan-info-overlay">
+          <!-- Always show overlay status -->
+          <div class="overlay-status">
+            <p>📡 Scanning for QR codes...</p>
+            <p v-if="!fileState.transmissionInfo">Ready to receive</p>
+          </div>
+          
           <div v-if="fileState.transmissionInfo" class="transmission-info">
             <h3>{{ fileState.transmissionInfo.filename }}</h3>
             <p>{{ formatFileSize(fileState.transmissionInfo.fileSize) }} | {{ fileState.transmissionInfo.totalChunks }} chunks</p>
@@ -33,7 +40,7 @@
             </div>
           </div>
 
-          <div class="overall-progress">
+          <div v-if="fileState.transmissionInfo" class="overall-progress">
             <p>Progress: {{ fileState.receivedChunks.size }}/{{ fileState.transmissionInfo?.totalChunks || 0 }} ({{ Math.round(overallProgressPercent) }}%)</p>
             <div class="progress-bar">
               <div 
@@ -45,25 +52,60 @@
 
           <div v-if="fileState.missingChunks.size > 0" class="missing-chunks">
             <p>Missing: {{ fileState.missingChunks.size }} chunks</p>
+            <div class="missing-list">{{ Array.from(fileState.missingChunks).sort((a, b) => a - b).join(', ') }}</div>
           </div>
-        </div>
-      </div>
+          </div> <!-- End scan-info-overlay -->
+        </div> <!-- End camera-wrapper -->
+      </div> <!-- End camera-section -->
       
       <!-- Controls positioned under camera window -->
       <div class="controls-section">
+        <div class="control-info" v-if="fileState.transmissionInfo">
+          <div class="file-summary">
+            <h3>{{ fileState.transmissionInfo.filename }}</h3>
+            <p>{{ formatFileSize(fileState.transmissionInfo.fileSize) }} • {{ fileState.transmissionInfo.totalChunks }} chunks</p>
+            <p>Progress: {{ fileState.receivedChunks.size }}/{{ fileState.transmissionInfo.totalChunks }} ({{ Math.round(overallProgressPercent) }}%)</p>
+          </div>
+          
+          <div v-if="fileState.currentBatch" class="batch-summary">
+            <p><strong>Current Batch:</strong> {{ fileState.currentBatch.batchNumber + 1 }}/{{ fileState.currentBatch.totalBatches }}</p>
+            <p><strong>Batch Progress:</strong> {{ receivedInCurrentBatch }}/{{ currentBatchSize }} ({{ Math.round(batchProgressPercent) }}%)</p>
+          </div>
+          
+          <div v-if="fileState.missingChunks.size > 0" class="missing-detail">
+            <p><strong>Missing {{ fileState.missingChunks.size }} chunks:</strong></p>
+            <div class="missing-ids">{{ Array.from(fileState.missingChunks).sort((a, b) => a - b).join(', ') }}</div>
+          </div>
+        </div>
+
         <div class="receiver-controls">
           <button @click="nextBatch" :disabled="!canNextBatch" class="batch-btn">
-            Next Batch
+            <span>📦</span> Next Batch
           </button>
           <button @click="resetReceiver" class="reset-btn">
-            Reset
+            <span>🔄</span> Reset Receiver
           </button>
           <button 
             @click="downloadFile" 
             :disabled="!fileState.isComplete"
             class="download-btn"
           >
-            Download
+            <span>💾</span> Download
+          </button>
+        </div>
+        
+        <div class="scanner-controls">
+          <button @click="startScanning" v-if="!isScannerActive" class="start-scan-btn">
+            <span>📷</span> Start Scanner
+          </button>
+          <button @click="stopScanning" v-if="isScannerActive" class="stop-scan-btn">
+            <span>⏹️</span> Stop Scanner
+          </button>
+          <button @click="switchCamera" :disabled="!canSwitchCamera" class="switch-camera-btn">
+            <span>🔄</span> Switch Camera
+          </button>
+          <button @click="restartScanner" class="restart-scanner-btn">
+            <span>🔃</span> Restart Scanner
           </button>
         </div>
 
@@ -89,6 +131,9 @@ import {
 
 const isReceiving = ref(false)
 const verificationStatus = ref<{ type: 'success' | 'error', message: string } | null>(null)
+const qrScanner = ref<InstanceType<typeof QRScanner>>()
+const isScannerActive = ref(false)
+const canSwitchCamera = ref(false)
 
 const fileState = reactive<FileTransferState>({
   chunks: new Map(),
@@ -130,6 +175,36 @@ const canNextBatch = computed(() => {
 function startReceiving() {
   isReceiving.value = true
   verificationStatus.value = null
+  // Auto-start scanning when receiving starts
+  setTimeout(() => {
+    startScanning()
+  }, 100)
+}
+
+function startScanning() {
+  if (qrScanner.value) {
+    qrScanner.value.startScanning()
+    isScannerActive.value = true
+  }
+}
+
+function stopScanning() {
+  if (qrScanner.value) {
+    qrScanner.value.stopScanning()
+    isScannerActive.value = false
+  }
+}
+
+function switchCamera() {
+  if (qrScanner.value) {
+    qrScanner.value.toggleCamera()
+  }
+}
+
+function restartScanner() {
+  if (qrScanner.value) {
+    qrScanner.value.restartScanner()
+  }
 }
 
 function handleQRScanned(result: QRProtocol & { rawData: string }) {
@@ -346,10 +421,20 @@ function formatFileSize(bytes: number): string {
 }
 
 .camera-section {
-  flex: 1;
   position: relative;
-  min-height: 300px;
-  max-height: calc(100vh - 200px);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.camera-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  max-height: 500px;
+  aspect-ratio: 1/1;
+  margin: 0 auto;
 }
 
 .scan-info-overlay {
@@ -358,13 +443,14 @@ function formatFileSize(bytes: number): string {
   right: 10px;
   width: 280px;
   max-height: calc(100% - 20px);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.7);
   border-radius: 8px;
   padding: 12px;
   color: white;
   overflow-y: auto;
-  z-index: 10;
+  z-index: 20;
   pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .controls-section {
@@ -374,6 +460,61 @@ function formatFileSize(bytes: number): string {
   border-top: 1px solid #e0e0e0;
 }
 
+.control-info {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.file-summary h3 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.file-summary p,
+.batch-summary p {
+  margin: 4px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.batch-summary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.missing-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.missing-detail p {
+  margin: 0 0 8px 0;
+  color: #dc3545;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.missing-ids {
+  font-family: monospace;
+  font-size: 12px;
+  color: #dc3545;
+  background: #fff5f5;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 100px;
+  overflow-y: auto;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.overlay-status,
 .transmission-info,
 .batch-info,
 .overall-progress,
@@ -383,6 +524,14 @@ function formatFileSize(bytes: number): string {
   border-radius: 0;
   padding: 0;
   margin-bottom: 12px;
+}
+
+.overlay-status p {
+  margin: 3px 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  font-style: italic;
 }
 
 .transmission-info h3 {
@@ -450,18 +599,46 @@ function formatFileSize(bytes: number): string {
   margin-bottom: 12px;
 }
 
+.scanner-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
 .batch-btn,
 .reset-btn,
-.download-btn {
-  padding: 10px 16px;
+.download-btn,
+.start-scan-btn,
+.stop-scan-btn,
+.switch-camera-btn,
+.restart-scanner-btn {
+  padding: 12px 16px;
   border: none;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
   flex: 1;
-  min-width: 100px;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.batch-btn span,
+.reset-btn span,
+.download-btn span,
+.start-scan-btn span,
+.stop-scan-btn span,
+.switch-camera-btn span,
+.restart-scanner-btn span {
+  font-size: 16px;
 }
 
 .batch-btn {
@@ -501,6 +678,47 @@ function formatFileSize(bytes: number): string {
   cursor: not-allowed;
 }
 
+.start-scan-btn {
+  background: #28a745;
+  color: white;
+}
+
+.start-scan-btn:hover {
+  background: #218838;
+}
+
+.stop-scan-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.stop-scan-btn:hover {
+  background: #c82333;
+}
+
+.switch-camera-btn {
+  background: #007bff;
+  color: white;
+}
+
+.switch-camera-btn:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.switch-camera-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.restart-scanner-btn {
+  background: #fd7e14;
+  color: white;
+}
+
+.restart-scanner-btn:hover {
+  background: #e8680b;
+}
+
 .verification-status {
   padding: 10px;
   border-radius: 6px;
@@ -526,9 +744,9 @@ function formatFileSize(bytes: number): string {
 }
 
 @media (max-width: 768px) {
-  .camera-section {
-    min-height: 250px;
-    max-height: calc(100vh - 250px);
+  .camera-wrapper {
+    max-width: 90vw;
+    max-height: 90vw;
   }
   
   .scan-info-overlay {
@@ -538,11 +756,28 @@ function formatFileSize(bytes: number): string {
     right: 10px;
     top: auto;
     width: auto;
-    max-height: 40vh;
+    max-height: 60vh;
   }
   
   .controls-section {
     padding: 12px 15px;
+  }
+  
+  .control-info {
+    padding: 12px;
+  }
+  
+  .file-summary h3 {
+    font-size: 15px;
+  }
+  
+  .file-summary p,
+  .batch-summary p {
+    font-size: 13px;
+  }
+  
+  .missing-detail p {
+    font-size: 13px;
   }
   
   .receiver-controls {
@@ -551,29 +786,55 @@ function formatFileSize(bytes: number): string {
   
   .batch-btn,
   .reset-btn,
-  .download-btn {
+  .download-btn,
+  .start-scan-btn,
+  .stop-scan-btn,
+  .switch-camera-btn,
+  .restart-scanner-btn {
     font-size: 12px;
-    padding: 8px 12px;
-    min-width: 80px;
+    padding: 10px 12px;
+    min-width: 100px;
   }
 }
 
 @media (max-width: 480px) {
-  .camera-section {
-    min-height: 200px;
-    max-height: calc(100vh - 200px);
+  .camera-wrapper {
+    max-width: 95vw;
+    max-height: 95vw;
   }
   
   .scan-info-overlay {
     left: 5px;
     right: 5px;
     bottom: 5px;
-    padding: 10px;
-    max-height: 35vh;
+    padding: 8px;
+    max-height: 45vh;
   }
   
   .controls-section {
     padding: 10px;
+  }
+  
+  .control-info {
+    padding: 10px;
+  }
+  
+  .file-summary h3 {
+    font-size: 14px;
+  }
+  
+  .file-summary p,
+  .batch-summary p {
+    font-size: 12px;
+  }
+  
+  .missing-detail p {
+    font-size: 12px;
+  }
+  
+  .missing-ids {
+    font-size: 11px;
+    max-height: 80px;
   }
   
   .transmission-info h3 {
@@ -589,12 +850,19 @@ function formatFileSize(bytes: number): string {
   
   .receiver-controls {
     gap: 6px;
+    flex-direction: column;
   }
   
   .batch-btn,
   .reset-btn,
-  .download-btn {
-    min-width: 70px;
+  .download-btn,
+  .start-scan-btn,
+  .stop-scan-btn,
+  .switch-camera-btn,
+  .restart-scanner-btn {
+    min-width: 100%;
+    font-size: 13px;
+    padding: 12px;
   }
 }
 </style>

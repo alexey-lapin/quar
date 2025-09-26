@@ -1,6 +1,6 @@
 <template>
   <div class="qr-scanner">
-    <div class="scanner-header">
+    <div v-if="!props.embedded" class="scanner-header">
       <h2>QR Code Scanner</h2>
       <div v-if="!(isScanning || hasStartedOnce)" class="start-section">
         <div class="permission-info">
@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <div v-if="scanResult" class="scan-result">
+    <div v-if="!props.embedded && scanResult" class="scan-result">
       <h3>Last Scanned:</h3>
       <div class="result-info">
         <p><strong>Type:</strong> {{ getResultTypeDescription(scanResult.type) }}</p>
@@ -64,7 +64,7 @@
       </div>
     </div>
 
-    <div class="scan-status">
+    <div v-if="!props.embedded" class="scan-status">
       <p>{{ statusMessage }}</p>
       <div v-if="duplicateCount > 0" class="duplicate-info">
         <p>Duplicates ignored: {{ duplicateCount }}</p>
@@ -81,6 +81,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { BrowserMultiFormatReader } from '@zxing/library'
 import { parseQR } from '../utils/protocol'
 import type { QRProtocol } from '../types'
+
+const props = defineProps<{
+  embedded?: boolean
+}>()
 
 const emit = defineEmits<{
   qrScanned: [result: QRProtocol & { rawData: string }]
@@ -455,6 +459,16 @@ function getChunkId(data: string): string {
 function truncateData(data: string, maxLength = 50): string {
   return data.length > maxLength ? data.slice(0, maxLength) + '...' : data
 }
+
+// Expose methods for parent components
+defineExpose({
+  startScanning,
+  stopScanning,
+  toggleCamera,
+  restartScanner,
+  clearScannedCodes,
+  forceRescan
+})
 </script>
 
 <style scoped>
@@ -526,14 +540,15 @@ function truncateData(data: string, maxLength = 50): string {
   position: relative;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  aspect-ratio: 4/3;
+  max-width: 500px;
+  max-height: 500px;
+  aspect-ratio: 1/1;
   border: none;
   border-radius: 0;
   background: #000;
   overflow: hidden;
   flex: 1;
+  margin: 0 auto;
 }
 
 .scanner-video {
@@ -714,7 +729,9 @@ function truncateData(data: string, maxLength = 50): string {
 
 @media (max-width: 600px) {
   .video-container {
-    aspect-ratio: 3/4; /* Better mobile aspect ratio */
+    aspect-ratio: 1/1; /* Keep squared on mobile */
+    max-width: 90vw;
+    max-height: 90vw;
   }
   
   .scanner-controls {
