@@ -12,41 +12,45 @@
     <div v-if="isReceiving" class="receiver-content">
       <div class="camera-section">
         <QRScanner @qr-scanned="handleQRScanned" />
-      </div>
-      
-      <div class="info-overlay">
-        <div v-if="fileState.transmissionInfo" class="transmission-info">
-          <h3>{{ fileState.transmissionInfo.filename }}</h3>
-          <p>{{ formatFileSize(fileState.transmissionInfo.fileSize) }} | {{ fileState.transmissionInfo.totalChunks }} chunks</p>
-        </div>
+        
+        <!-- Transparent scan info overlay over camera -->
+        <div class="scan-info-overlay">
+          <div v-if="fileState.transmissionInfo" class="transmission-info">
+            <h3>{{ fileState.transmissionInfo.filename }}</h3>
+            <p>{{ formatFileSize(fileState.transmissionInfo.fileSize) }} | {{ fileState.transmissionInfo.totalChunks }} chunks</p>
+          </div>
 
-        <div v-if="fileState.currentBatch" class="batch-info">
-          <p>Batch {{ fileState.currentBatch.batchNumber + 1 }}/{{ fileState.currentBatch.totalBatches }}</p>
-          <div class="batch-progress">
-            <div class="batch-progress-bar">
+          <div v-if="fileState.currentBatch" class="batch-info">
+            <p>Batch {{ fileState.currentBatch.batchNumber + 1 }}/{{ fileState.currentBatch.totalBatches }}</p>
+            <div class="batch-progress">
+              <div class="batch-progress-bar">
+                <div 
+                  class="batch-progress-fill" 
+                  :style="{ width: batchProgressPercent + '%' }"
+                ></div>
+              </div>
+              <span>{{ receivedInCurrentBatch }}/{{ currentBatchSize }}</span>
+            </div>
+          </div>
+
+          <div class="overall-progress">
+            <p>Progress: {{ fileState.receivedChunks.size }}/{{ fileState.transmissionInfo?.totalChunks || 0 }} ({{ Math.round(overallProgressPercent) }}%)</p>
+            <div class="progress-bar">
               <div 
-                class="batch-progress-fill" 
-                :style="{ width: batchProgressPercent + '%' }"
+                class="progress-fill" 
+                :style="{ width: overallProgressPercent + '%' }"
               ></div>
             </div>
-            <span>{{ receivedInCurrentBatch }}/{{ currentBatchSize }}</span>
+          </div>
+
+          <div v-if="fileState.missingChunks.size > 0" class="missing-chunks">
+            <p>Missing: {{ fileState.missingChunks.size }} chunks</p>
           </div>
         </div>
-
-        <div class="overall-progress">
-          <p>Progress: {{ fileState.receivedChunks.size }}/{{ fileState.transmissionInfo?.totalChunks || 0 }} ({{ Math.round(overallProgressPercent) }}%)</p>
-          <div class="progress-bar">
-            <div 
-              class="progress-fill" 
-              :style="{ width: overallProgressPercent + '%' }"
-            ></div>
-          </div>
-        </div>
-
-        <div v-if="fileState.missingChunks.size > 0" class="missing-chunks">
-          <p>Missing: {{ fileState.missingChunks.size }} chunks</p>
-        </div>
-
+      </div>
+      
+      <!-- Controls positioned under camera window -->
+      <div class="controls-section">
         <div class="receiver-controls">
           <button @click="nextBatch" :disabled="!canNextBatch" class="batch-btn">
             Next Batch
@@ -338,27 +342,36 @@ function formatFileSize(bytes: number): string {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .camera-section {
   flex: 1;
   position: relative;
-  min-height: 0;
+  min-height: 300px;
+  max-height: calc(100vh - 200px);
 }
 
-.info-overlay {
+.scan-info-overlay {
   position: absolute;
   top: 10px;
   right: 10px;
   width: 280px;
   max-height: calc(100% - 20px);
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  color: white;
   overflow-y: auto;
   z-index: 10;
+  pointer-events: none;
+}
+
+.controls-section {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid #e0e0e0;
 }
 
 .transmission-info,
@@ -369,23 +382,25 @@ function formatFileSize(bytes: number): string {
   border: none;
   border-radius: 0;
   padding: 0;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .transmission-info h3 {
-  margin: 0 0 8px 0;
-  color: #333;
-  font-size: 16px;
+  margin: 0 0 6px 0;
+  color: white;
+  font-size: 14px;
   font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .transmission-info p,
 .batch-info p,
 .overall-progress p,
 .missing-chunks p {
-  margin: 4px 0;
-  color: #666;
-  font-size: 13px;
+  margin: 3px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .batch-progress,
@@ -397,22 +412,24 @@ function formatFileSize(bytes: number): string {
 .progress-bar {
   width: 100%;
   height: 6px;
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 3px;
   overflow: hidden;
-  margin: 4px 0;
+  margin: 3px 0;
 }
 
 .batch-progress-fill,
 .progress-fill {
   height: 100%;
-  background: #28a745;
+  background: #4CAF50;
   transition: width 0.3s ease;
+  box-shadow: 0 0 4px rgba(76, 175, 80, 0.6);
 }
 
 .batch-progress span {
-  font-size: 12px;
-  color: #666;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .missing-list {
@@ -427,24 +444,24 @@ function formatFileSize(bytes: number): string {
 
 .receiver-controls {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .batch-btn,
 .reset-btn,
 .download-btn {
-  padding: 8px 12px;
+  padding: 10px 16px;
   border: none;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
   flex: 1;
-  min-width: 0;
+  min-width: 100px;
 }
 
 .batch-btn {
@@ -509,46 +526,75 @@ function formatFileSize(bytes: number): string {
 }
 
 @media (max-width: 768px) {
-  .info-overlay {
+  .camera-section {
+    min-height: 250px;
+    max-height: calc(100vh - 250px);
+  }
+  
+  .scan-info-overlay {
     position: absolute;
     bottom: 10px;
     left: 10px;
     right: 10px;
     top: auto;
     width: auto;
-    max-height: 50vh;
+    max-height: 40vh;
+  }
+  
+  .controls-section {
+    padding: 12px 15px;
   }
   
   .receiver-controls {
-    flex-direction: row;
-    gap: 6px;
+    gap: 8px;
   }
   
   .batch-btn,
   .reset-btn,
   .download-btn {
-    font-size: 11px;
-    padding: 6px 10px;
+    font-size: 12px;
+    padding: 8px 12px;
+    min-width: 80px;
   }
 }
 
 @media (max-width: 480px) {
-  .info-overlay {
+  .camera-section {
+    min-height: 200px;
+    max-height: calc(100vh - 200px);
+  }
+  
+  .scan-info-overlay {
     left: 5px;
     right: 5px;
     bottom: 5px;
-    padding: 12px;
+    padding: 10px;
+    max-height: 35vh;
+  }
+  
+  .controls-section {
+    padding: 10px;
   }
   
   .transmission-info h3 {
-    font-size: 14px;
+    font-size: 13px;
   }
   
   .transmission-info p,
   .batch-info p,
   .overall-progress p,
   .missing-chunks p {
-    font-size: 12px;
+    font-size: 11px;
+  }
+  
+  .receiver-controls {
+    gap: 6px;
+  }
+  
+  .batch-btn,
+  .reset-btn,
+  .download-btn {
+    min-width: 70px;
   }
 }
 </style>

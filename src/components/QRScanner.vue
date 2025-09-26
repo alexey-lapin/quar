@@ -2,7 +2,7 @@
   <div class="qr-scanner">
     <div class="scanner-header">
       <h2>QR Code Scanner</h2>
-      <div v-if="!isScanning" class="start-section">
+      <div v-if="!(isScanning || hasStartedOnce)" class="start-section">
         <div class="permission-info">
           <p>📷 Camera access is required to scan QR codes</p>
           <p class="info-text">Click below to request camera permission</p>
@@ -412,12 +412,12 @@ function handleScanResult(rawData: string) {
     failedScanCount.value++
     console.log(`Failed scan count: ${failedScanCount.value}`)
     
-    if (failedScanCount.value >= 3) {
-      console.log('Too many failed scans, restarting scanner...')
-      setTimeout(() => {
-        restartScanner()
-      }, 1000)
-    }
+    // if (failedScanCount.value >= 3) {
+    //   console.log('Too many failed scans, restarting scanner...')
+    //   setTimeout(() => {
+    //     restartScanner()
+    //   }, 1000)
+    // }
     
     return
   }
@@ -462,9 +462,10 @@ function truncateData(data: string, maxLength = 50): string {
   width: 100%;
   height: 100%;
   margin: 0;
-  padding: 5px;
+  padding: 3px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .scanner-header {
@@ -525,8 +526,8 @@ function truncateData(data: string, maxLength = 50): string {
   position: relative;
   width: 100%;
   height: 100%;
-  max-width: calc(100vh - 10px);
-  max-height: calc(100vh - 150px);
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 4/3;
   border: none;
   border-radius: 0;
