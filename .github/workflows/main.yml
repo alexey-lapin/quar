@@ -36,7 +36,7 @@ jobs:
         run: npm run build  # Build the Vite app
 
       - name: Upload artifact to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
