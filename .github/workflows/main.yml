@@ -28,17 +28,42 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci  # Ensures clean installation
+        run: npm ci
 
       - name: Build the project
         env:
           VITE_APP_PUBLIC_PATH: /quar
-        run: npm run build  # Build the Vite app
+        run: npm run build
 
       - name: Upload artifact to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+  build-single-file:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the project
+        env:
+          VITE_APP_SINGLE_FILE: true
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quar-dist
+          path: dist/*.html
 
   deploy:
     needs: build
@@ -88,3 +113,28 @@ jobs:
           tags: |
             ${{ env.CR_REGISTRY }}/${{ env.CR_NAMESPACE }}/quar:latest
             ${{ env.CR_REGISTRY }}/${{ env.CR_NAMESPACE }}/quar:${{ env.TAG }}
+
+  release:
+    needs: build-single-file
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quar-dist
+          path: quar-dist
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create ${{ github.ref_name }}
+          --title ${{ github.ref_name }}
+          --generate-notes
+          --fail-on-no-commits
+          quar-dist/*.html
